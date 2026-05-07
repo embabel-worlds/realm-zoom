@@ -1,0 +1,60 @@
+# Zoom Meeting / Recording API.
+#
+# Vendored, hand-curated mini-spec (~6 ops) covering the assistant's
+# transcript-ingest workflow. Zoom does publish a public OpenAPI spec
+# but it is multi-megabyte and ~85% irrelevant for chat-driven use.
+#
+# Auth: OAuth2 against a Zoom OAuth app registered ONCE per assistant
+# deployment under the `zoom` provider id. Client credentials live in
+# the deployment's `admin/oauth-apps.yml`:
+#
+#   apps:
+#     zoom:
+#       client-id: <zoom oauth client id>
+#       client-secret: <zoom oauth client secret>
+#       webhook-secret: <Zoom Webhook Secret Token>   # SEPARATE FROM client-secret
+#
+# Zoom is one of the (few) providers where the Webhook Secret Token is
+# distinct from the OAuth client secret — both come from the same Zoom
+# app config screen, but they are different strings. The assistant
+# resolves `secret-ref.oauth-app: zoom` to `webhook-secret` if set,
+# falling back to `client-secret`. The URL-validation handshake at
+# `/api/v1/webhooks/zoom` uses the same lookup.
+#
+# End users see a single "Authorize" button in
+# Settings → Connected Services → Zoom; nothing else to configure.
+#
+# Operation-id curation: keep it small. Zoom has 200+ operations; we
+# expose 6 that cover ~95% of recordings/transcripts use. Add when a
+# concrete need arises.
+
+- url: zoom-api.json
+  name: zoom
+  type: openapi
+  auth: oauth2
+  oauth2:
+    provider: zoom
+    auth-url: https://zoom.us/oauth/authorize
+    token-url: https://zoom.us/oauth/token
+    scopes: >-
+      cloud_recording:read
+      meeting:read
+      meeting_summary:read:summary
+      user:read
+    identity:
+      url: https://api.zoom.us/v2/users/me
+      method: GET
+      auth: bearer
+      account-id-field: id
+      display-name-field: email
+    webhook-tenancy:
+      store: zoom-account-id
+      account-id-field: account_id
+  operation-ids:
+    - users/me
+    - users/recordings/list
+    - meetings/recordings/get
+    - meetings/get
+    - meetings/meeting_summary/get
+    - past_meetings/get
+    - past_meetings/instances

@@ -1,0 +1,41 @@
+# Zoom `meeting.summary_completed` webhook — fires when Zoom AI
+# Companion finishes generating the post-meeting summary
+# (overview, next steps, key topics, decisions, action items).
+#
+# Requires:
+#  - The host's Zoom plan/tenant has AI Companion enabled.
+#  - The host enabled "Meeting Summary with AI Companion" before/during
+#    the meeting (admin-controlled feature toggle).
+#  - The Marketplace app has the `meeting_summary:read:summary` /
+#    `meeting:read:summary` scope (Zoom names vary by app type).
+#
+# Payload carries the meeting `uuid` and a snapshot of the summary
+# text; the action can also call `GET /meetings/{meetingUUID}/meeting_summary`
+# to re-fetch authoritatively (useful if the summary is later edited
+# in Zoom's UI).
+#
+# Same signature + tenancy shape as `recording-completed.yml`.
+
+- name: zoom-meeting-summary-completed
+  description: Receive Zoom AI Companion meeting.summary_completed events
+  source: zoom
+  events: [meeting.summary_completed]
+  action: webhook-zoom-meeting-summary-completed
+
+  signature:
+    scheme: hmac-sha256
+    encoding: hex
+    header: x-zm-signature
+    prefix: "v0="
+    template: "v0:{timestamp}:{body}"
+    timestamp:
+      header: x-zm-request-timestamp
+      unit: ms
+      tolerance-seconds: 300
+    secret-ref:
+      oauth-app: zoom
+
+  tenancy:
+    resolver: payload-field
+    field: payload.account_id
+    store: zoom-account-id

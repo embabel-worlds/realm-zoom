@@ -1,0 +1,60 @@
+# Zoom `recording.completed` webhook.
+#
+# Wired end-to-end as follows:
+#
+# 1. Operator builds a "Server-to-Server OAuth" or "OAuth" app at
+#    https://marketplace.zoom.us/develop/create. Under
+#    Feature → Event Subscriptions → Add Event Subscription:
+#      - Event notification endpoint URL =
+#          https://<your-public-host>/api/v1/webhooks/zoom
+#      - Subscribe to "All Recordings have completed" (`recording.completed`)
+#        and "All Transcripts have completed" (`recording.transcript_completed`).
+#    Copy the app's "Secret Token" (Feature → Event Subscriptions panel) and
+#    paste it into `admin/oauth-apps.yml` under `apps.zoom.webhook-secret`.
+#
+# 2. Click "Validate" in the Zoom subscription UI. Zoom POSTs a synchronous
+#    `endpoint.url_validation` event; the assistant handles it directly in
+#    `WebhookController` (no end-user workspace involved) — replies with
+#    `{plainToken, encryptedToken}`. The Secret Token resolves via the same
+#    `oauth-apps.yml` entry.
+#
+# 3. End user OAuths via Settings → Connected Services → Zoom. The OAuth
+#    callback resolves the Zoom user's `id` (declared in `apis/apis.yml`
+#    under `oauth2.identity.account-id-field`) AND captures the user's
+#    Zoom `account_id` for webhook tenancy (declared under
+#    `oauth2.webhook-tenancy.account-id-field`).
+#
+# 4. Zoom fires this webhook to the target URL when a meeting's cloud
+#    recording finishes processing. Platform:
+#    - Reads `tenancy.field: payload.account_id` from the JSON.
+#    - Looks up `(zoom-account-id, account_id) → user`.
+#    - Verifies `signature.scheme: hmac-sha256` against the Secret Token.
+#    - Routes to the user's workspace and runs the action below.
+#
+# Zoom-specific signature shape:
+#   x-zm-signature: v0=<hex(hmac_sha256(secret, "v0:" + ts + ":" + body))>
+#   x-zm-request-timestamp: <epoch ms>
+
+- name: zoom-recording-completed
+  description: Receive Zoom recording.completed events (audio/video ready)
+  source: zoom
+  events: [recording.completed]
+  action: webhook-zoom-recording-completed
+
+  signature:
+    scheme: hmac-sha256
+    encoding: hex
+    header: x-zm-signature
+    prefix: "v0="
+    template: "v0:{timestamp}:{body}"
+    timestamp:
+      header: x-zm-request-timestamp
+      unit: ms
+      tolerance-seconds: 300
+    secret-ref:
+      oauth-app: zoom
+
+  tenancy:
+    resolver: payload-field
+    field: payload.account_id
+    store: zoom-account-id

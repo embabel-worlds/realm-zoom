@@ -1,0 +1,33 @@
+# Zoom `recording.transcript_completed` webhook.
+#
+# Fires after `recording.completed` once the audio-transcript artefact
+# is processed. The payload includes a short-lived `download_token`
+# you can use as `?access_token=<token>` on each `download_url` to
+# fetch the VTT without needing the user's OAuth bearer.
+#
+# Same auth/tenancy as `recording-completed.yml`. See that file for
+# end-to-end wiring notes.
+
+- name: zoom-recording-transcript-completed
+  description: Receive Zoom recording.transcript_completed events (VTT ready)
+  source: zoom
+  events: [recording.transcript_completed]
+  action: webhook-zoom-recording-transcript-completed
+
+  signature:
+    scheme: hmac-sha256
+    encoding: hex
+    header: x-zm-signature
+    prefix: "v0="
+    template: "v0:{timestamp}:{body}"
+    timestamp:
+      header: x-zm-request-timestamp
+      unit: ms
+      tolerance-seconds: 300
+    secret-ref:
+      oauth-app: zoom
+
+  tenancy:
+    resolver: payload-field
+    field: payload.account_id
+    store: zoom-account-id

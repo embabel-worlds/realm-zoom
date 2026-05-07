@@ -1,0 +1,310 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Zoom Meeting API (curated)",
+    "description": "Hand-curated mini-spec of the Zoom Meeting API focused on meetings, cloud recordings, and transcripts — the surface a chat-assistant most often touches. Modeled on the public Zoom Marketplace API (https://developers.zoom.us/docs/api/). Server-to-server requests require an OAuth bearer token under the `cloud_recording:read` and `meeting:read` scopes.\n\nNot exhaustive: webhook subscriptions, meeting-creation, registrants, polls/surveys, accounts, billing, and chat APIs are intentionally omitted. Add when there is a concrete need.",
+    "version": "2.0.0"
+  },
+  "servers": [
+    { "url": "https://api.zoom.us/v2" }
+  ],
+  "security": [{ "oauth2": [] }],
+  "paths": {
+    "/users/me": {
+      "get": {
+        "operationId": "users.me",
+        "summary": "Get the authenticated user.",
+        "description": "Returns the Zoom user that owns the current OAuth token. Use this to discover the user's `id` (needed for `/users/{userId}/recordings`) and `account_id` (needed to verify webhook tenancy).",
+        "responses": {
+          "200": {
+            "description": "User object",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } }
+          }
+        }
+      }
+    },
+    "/users/{userId}/recordings": {
+      "get": {
+        "operationId": "users.recordings.list",
+        "summary": "List a user's cloud recordings.",
+        "description": "Returns cloud recordings for the user. Default range is the last 7 days; `from` / `to` widen up to a month per request. Pass `userId: \"me\"` for the authenticated user. Each meeting in `meetings[]` carries a `recording_files[]` array — the `TRANSCRIPT` entry is the closed-caption VTT; `CHAT` is the chat transcript; `M4A`/`MP4` are audio/video.",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "required": false, "description": "ISO date `YYYY-MM-DD`.", "schema": { "type": "string" } },
+          { "name": "to", "in": "query", "required": false, "description": "ISO date `YYYY-MM-DD`.", "schema": { "type": "string" } },
+          { "name": "page_size", "in": "query", "required": false, "schema": { "type": "integer", "default": 30, "maximum": 300 } },
+          { "name": "next_page_token", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "mc", "in": "query", "required": false, "description": "Master-account flag; usually omit.", "schema": { "type": "boolean" } },
+          { "name": "trash", "in": "query", "required": false, "description": "Include trashed recordings.", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of recordings",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordingListResponse" } } }
+          }
+        }
+      }
+    },
+    "/meetings/{meetingId}/recordings": {
+      "get": {
+        "operationId": "meetings.recordings.get",
+        "summary": "Get all cloud recordings for a meeting.",
+        "description": "Returns the meeting's `recording_files[]`. For transcripts, look for `file_type: \"TRANSCRIPT\"` (closed-caption VTT) or `file_type: \"CC\"` (closed captions text). The `download_url` requires the OAuth bearer; for webhook-driven flows Zoom additionally provides a short-lived `download_token` in the event payload that lets you fetch without OAuth.\n\n`meetingId` accepts either a numeric meeting id (long-lived) or a meeting UUID (instance-specific). For past meetings prefer the UUID; if it contains `/` or `//` you must double-URL-encode it (Zoom's documented quirk).",
+        "parameters": [
+          { "name": "meetingId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "include_fields", "in": "query", "required": false, "description": "Comma list, e.g. `download_access_token`.", "schema": { "type": "string" } },
+          { "name": "ttl", "in": "query", "required": false, "description": "TTL in seconds for the embedded `download_access_token` (max 604800).", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recording with files",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MeetingRecording" } } }
+          }
+        }
+      }
+    },
+    "/meetings/{meetingId}": {
+      "get": {
+        "operationId": "meetings.get",
+        "summary": "Get meeting details.",
+        "description": "Returns metadata about a scheduled or past meeting (topic, agenda, host, start_time, duration). Useful for enriching transcripts with the meeting's name and host context before ingest.",
+        "parameters": [
+          { "name": "meetingId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "occurrence_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "show_previous_occurrences", "in": "query", "required": false, "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meeting object",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Meeting" } } }
+          }
+        }
+      }
+    },
+    "/meetings/{meetingUUID}/meeting_summary": {
+      "get": {
+        "operationId": "meetings.meeting_summary.get",
+        "summary": "Get the AI Companion meeting summary.",
+        "description": "Returns the post-meeting AI summary generated by Zoom AI Companion. Includes `summary_overview`, `summary_details[]` (chapter summaries), `next_steps[]`, `key_questions[]`, and the meeting's `summary_title`. Requires AI Companion enabled on the host's account AND that the host enabled summary for the meeting. Returns 404 if no summary exists; 403 if the scope is missing.\n\n`meetingUUID` is the meeting *instance* UUID (from `past_meetings.instances` or from a `recording.completed` webhook). Double-URL-encode if it starts with `/` or contains `//`.",
+        "parameters": [
+          { "name": "meetingUUID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summary object",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MeetingSummary" } } }
+          }
+        }
+      }
+    },
+    "/past_meetings/{meetingUUID}": {
+      "get": {
+        "operationId": "past_meetings.get",
+        "summary": "Get past meeting details.",
+        "description": "Returns information about a single past meeting *instance* (start_time, end_time, duration, total_minutes, participants_count). Use UUID — double-URL-encode if it starts with `/` or contains `//`.",
+        "parameters": [
+          { "name": "meetingUUID", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Past-meeting object",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PastMeeting" } } }
+          }
+        }
+      }
+    },
+    "/past_meetings/{meetingId}/instances": {
+      "get": {
+        "operationId": "past_meetings.instances",
+        "summary": "List past meeting instances.",
+        "description": "Lists all past instances of a recurring meeting. Each `meetings[].uuid` is the input to `past_meetings.get` and to `meetings.recordings.get`.",
+        "parameters": [
+          { "name": "meetingId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instances list",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PastMeetingInstances" } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://zoom.us/oauth/authorize",
+            "tokenUrl": "https://zoom.us/oauth/token",
+            "scopes": {
+              "cloud_recording:read": "Read cloud recordings and transcripts",
+              "meeting:read": "Read meeting metadata",
+              "meeting_summary:read:summary": "Read AI Companion meeting summaries",
+              "user:read": "Read the authenticated user"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Zoom user id." },
+          "account_id": { "type": "string", "description": "Zoom account/tenant id." },
+          "email": { "type": "string" },
+          "first_name": { "type": "string" },
+          "last_name": { "type": "string" },
+          "type": { "type": "integer", "description": "1=Basic, 2=Licensed, 3=On-prem." },
+          "timezone": { "type": "string" },
+          "language": { "type": "string" }
+        }
+      },
+      "RecordingListResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "page_count": { "type": "integer" },
+          "page_size": { "type": "integer" },
+          "total_records": { "type": "integer" },
+          "next_page_token": { "type": "string" },
+          "meetings": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MeetingRecording" }
+          }
+        }
+      },
+      "MeetingRecording": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string" },
+          "id": { "type": "integer", "format": "int64", "description": "Numeric meeting id." },
+          "host_id": { "type": "string" },
+          "account_id": { "type": "string" },
+          "topic": { "type": "string" },
+          "type": { "type": "integer" },
+          "start_time": { "type": "string", "format": "date-time" },
+          "timezone": { "type": "string" },
+          "duration": { "type": "integer", "description": "Minutes." },
+          "total_size": { "type": "integer", "format": "int64" },
+          "recording_count": { "type": "integer" },
+          "share_url": { "type": "string" },
+          "recording_files": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecordingFile" }
+          }
+        }
+      },
+      "RecordingFile": {
+        "type": "object",
+        "description": "A single artefact from a cloud recording. `file_type` indicates the kind: `MP4` (video), `M4A` (audio), `CHAT` (chat log), `TRANSCRIPT` (closed-caption VTT), `CC` (raw captions), `TIMELINE`, `SUMMARY` (post-meeting AI summary, where licensed).",
+        "properties": {
+          "id": { "type": "string" },
+          "meeting_id": { "type": "string" },
+          "recording_start": { "type": "string", "format": "date-time" },
+          "recording_end": { "type": "string", "format": "date-time" },
+          "file_type": { "type": "string", "enum": ["MP4", "M4A", "CHAT", "TRANSCRIPT", "CC", "CSV", "TIMELINE", "SUMMARY"] },
+          "file_extension": { "type": "string" },
+          "file_size": { "type": "integer", "format": "int64" },
+          "play_url": { "type": "string" },
+          "download_url": { "type": "string", "description": "GET this URL with `Authorization: Bearer <oauth-token>`, OR with `?access_token=<download_token>` from a webhook payload, to download the artefact." },
+          "status": { "type": "string", "enum": ["completed", "processing"] },
+          "recording_type": { "type": "string", "description": "e.g. `shared_screen_with_speaker_view`, `audio_only`, `audio_transcript`." }
+        }
+      },
+      "Meeting": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string" },
+          "id": { "type": "integer", "format": "int64" },
+          "host_id": { "type": "string" },
+          "host_email": { "type": "string" },
+          "topic": { "type": "string" },
+          "agenda": { "type": "string" },
+          "type": { "type": "integer", "description": "1=instant, 2=scheduled, 3=recurring no fixed time, 8=recurring fixed time." },
+          "status": { "type": "string" },
+          "start_time": { "type": "string", "format": "date-time" },
+          "duration": { "type": "integer" },
+          "timezone": { "type": "string" },
+          "join_url": { "type": "string" }
+        }
+      },
+      "MeetingSummary": {
+        "type": "object",
+        "description": "Zoom AI Companion post-meeting summary.",
+        "properties": {
+          "meeting_host_id": { "type": "string" },
+          "meeting_host_email": { "type": "string" },
+          "meeting_uuid": { "type": "string" },
+          "meeting_id": { "type": "integer", "format": "int64" },
+          "meeting_topic": { "type": "string" },
+          "meeting_start_time": { "type": "string", "format": "date-time" },
+          "meeting_end_time": { "type": "string", "format": "date-time" },
+          "summary_start_time": { "type": "string", "format": "date-time" },
+          "summary_end_time": { "type": "string", "format": "date-time" },
+          "summary_created_time": { "type": "string", "format": "date-time" },
+          "summary_last_modified_time": { "type": "string", "format": "date-time" },
+          "summary_title": { "type": "string" },
+          "summary_overview": { "type": "string", "description": "Concise paragraph describing the whole meeting." },
+          "summary_details": {
+            "type": "array",
+            "description": "Chapter-level breakdown. Each entry is one section of the meeting.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "summary": { "type": "string" }
+              }
+            }
+          },
+          "next_steps": {
+            "type": "array",
+            "description": "Action items / follow-ups detected by AI Companion.",
+            "items": { "type": "string" }
+          },
+          "key_questions": {
+            "type": "array",
+            "description": "Open questions raised but not resolved during the meeting.",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "PastMeeting": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string" },
+          "id": { "type": "integer", "format": "int64" },
+          "host_id": { "type": "string" },
+          "user_email": { "type": "string" },
+          "user_name": { "type": "string" },
+          "topic": { "type": "string" },
+          "type": { "type": "integer" },
+          "start_time": { "type": "string", "format": "date-time" },
+          "end_time": { "type": "string", "format": "date-time" },
+          "duration": { "type": "integer", "description": "Minutes." },
+          "total_minutes": { "type": "integer" },
+          "participants_count": { "type": "integer" },
+          "dept": { "type": "string" }
+        }
+      },
+      "PastMeetingInstances": {
+        "type": "object",
+        "properties": {
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": { "type": "string" },
+                "start_time": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
