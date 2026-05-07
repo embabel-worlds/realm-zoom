@@ -101,6 +101,22 @@ Add when concrete need arises:
 - Phone, Contact Center, Whiteboard, Chat APIs.
 - Account/billing/admin surface.
 
+## Known limitation: multi-user-per-Zoom-account
+
+Zoom webhooks identify the *tenant* (`account_id`), not the user. The
+assistant uses the same identifier for OAuth identity AND webhook
+tenant routing, so:
+
+- **Single user per Zoom org** (most common): everything works.
+- **Multiple users from the same Zoom org each connect separately**:
+  the last user to authorize "wins" the webhook tenant slot. Inbound
+  webhooks for that org route to the most-recent user only. Other
+  users' UIs still see their recordings via OAuth, but post-meeting
+  webhooks won't fan out.
+
+The fix is a framework change (decouple OAuth identity from webhook
+tenant key); not in `v0.1`. Track upstream.
+
 ## Versioning
 
 `v0.1.0` — initial: recordings, transcripts, AI summary, three webhooks,

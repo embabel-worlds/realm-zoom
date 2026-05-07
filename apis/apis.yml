@@ -45,11 +45,18 @@
       url: https://api.zoom.us/v2/users/me
       method: GET
       auth: bearer
-      account-id-field: id
+      # Zoom userinfo carries BOTH `id` (per-user) and `account_id`
+      # (per-tenant). We key OAuth identity off `account_id` because
+      # that is the value Zoom puts in every webhook payload — it has
+      # to match for `webhookTenantRegistry` lookup to succeed.
+      # Trade-off: in a multi-Zoom-user-per-org install, the last
+      # user to OAuth wins the webhook tenant slot for that org. For
+      # the typical single-user-per-workspace case this is fine.
+      # `display-name-field: email` keeps the UI rows distinguishable.
+      account-id-field: account_id
       display-name-field: email
     webhook-tenancy:
       store: zoom-account-id
-      account-id-field: account_id
   operation-ids:
     - users/me
     - users/recordings/list
