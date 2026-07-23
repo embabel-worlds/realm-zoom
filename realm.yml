@@ -2,7 +2,7 @@ name: zoom
 description: "Zoom Cloud Meetings — typed via a curated, vendored OpenAPI 3 spec covering the recordings/transcripts surface (list user recordings, get meeting recordings, past-meeting metadata). Bundles a `recording.completed` and `recording.transcript_completed` webhook (with HMAC-SHA256 verification and account-id tenancy) and a `zoom-recordings` Agent Skill that teaches the post-meeting transcript-ingest workflow."
 version: 0.1.0
 author: Rod Johnson
-url: https://github.com/johnsonr/pack-zoom
+url: https://github.com/johnsonr/realm-zoom
 tags:
   - integrations
   - zoom
