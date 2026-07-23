@@ -21,7 +21,7 @@ Method names mirror the spec's operation ids with dots → underscores
 - `gateway.zoom.past_meetings_get({ meetingUUID: "<uuid>" })`
 - `gateway.zoom.past_meetings_instances({ meetingId: "<id>" })`
 
-If a call returns `gateway.zoom.foo is not a workspace tool`, the error lists every
+If a call returns `gateway.zoom.foo is not a world tool`, the error lists every
 valid method — pick from it. Never re-send the same call.
 
 ## Cardinal rules
@@ -89,7 +89,7 @@ const url = `${transcriptFile.download_url}?access_token=${download_token}`;
 const vtt = await fetch(url).then(r => r.text());
 ```
 
-**(b) From an interactive call.** Use the workspace's authenticated HTTP
+**(b) From an interactive call.** Use the world's authenticated HTTP
 fetch (the OAuth bearer is added automatically for `https://*.zoom.us`):
 
 ```javascript
@@ -167,7 +167,7 @@ const all = await gateway.zoom.past_meetings_instances({ meetingId: "<numeric-id
 for (const m of all.meetings) console.log(m.uuid, m.start_time);
 ```
 
-## Things that are NOT in this pack
+## Things that are NOT in this realm
 
 Add when there is a concrete need:
 

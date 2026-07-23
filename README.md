@@ -1,11 +1,11 @@
-# pack-zoom
+# realm-zoom
 
 Zoom Cloud Meetings — recordings, transcripts (VTT), and AI Companion
 summaries, typed via a curated, vendored OpenAPI 3 mini-spec.
 
-> Pack authoring reference: see
-> [`docs/pack-format.md`](https://github.com/embabel/assistant/blob/main/docs/pack-format.md)
-> in the assistant repo for the full pack format spec.
+> Realm authoring reference: see
+> [`docs/realm-format.md`](https://github.com/embabel/assistant/blob/main/docs/realm-format.md)
+> in the assistant repo for the full realm format spec.
 
 ## What you get
 
@@ -21,7 +21,7 @@ summaries, typed via a curated, vendored OpenAPI 3 mini-spec.
   summary fold-in, document persistence shape).
 - The assistant's webhook controller already handles Zoom's
   synchronous `endpoint.url_validation` CRC handshake (added in the
-  same release as this pack); just paste the Secret Token into
+  same release as this realm); just paste the Secret Token into
   `oauth-apps.yml` and click "Validate" in the Zoom Marketplace UI.
 
 ## Auth — OAuth2
@@ -62,7 +62,7 @@ Register a Zoom OAuth app at
    is what Zoom uses to sign webhook bodies. **It is not the same as
    the OAuth client secret.**
 
-Then paste both into `<workspace-base>/admin/oauth-apps.yml`:
+Then paste both into `<world-base>/admin/oauth-apps.yml`:
 
 ```yaml
 apps:
