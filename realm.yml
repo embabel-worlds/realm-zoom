@@ -3,6 +3,7 @@ description: "Zoom Cloud Meetings — typed via a curated, vendored OpenAPI 3 sp
 version: 0.1.0
 author: Rod Johnson
 url: https://github.com/johnsonr/realm-zoom
+category: productivity
 tags:
   - integrations
   - zoom
