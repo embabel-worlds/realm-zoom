@@ -58,10 +58,10 @@
     webhook-tenancy:
       store: zoom-account-id
   operation-ids:
-    - users/me
-    - users/recordings/list
-    - meetings/recordings/get
-    - meetings/get
-    - meetings/meeting_summary/get
-    - past_meetings/get
-    - past_meetings/instances
+    - users.me
+    - users.recordings.list
+    - meetings.recordings.get
+    - meetings.get
+    - meetings.meeting_summary.get
+    - past_meetings.get
+    - past_meetings.instances
